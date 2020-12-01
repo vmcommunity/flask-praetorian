@@ -77,6 +77,61 @@ class User(db.Model):
     def is_valid(self):
         return self.is_active
 
+class Token_Store(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    token_name = db.Column(db.Text, unique=True)
+    roles = db.Column(db.Text)
+    is_active = db.Column(db.Boolean, default=True, server_default="true")
+
+    @property
+    def identity(self):
+        """
+        *Required Attribute or Property*
+
+        flask-praetorian requires that the user class has an ``identity`` instance
+        attribute or property that provides the unique id of the user instance
+        """
+        return self.id
+
+    @property
+    def rolenames(self):
+        """
+        *Required Attribute or Property*
+
+        flask-praetorian requires that the user class has a ``rolenames`` instance
+        attribute or property that provides a list of strings that describe the roles
+        attached to the user instance
+        """
+        try:
+            return self.roles.split(",")
+        except Exception:
+            return []
+
+    @classmethod
+    def lookup(cls, token_name):
+        """
+        *Required Method*
+
+        flask-praetorian requires that the user class implements a ``lookup()``
+        class method that takes a single ``username`` argument and returns a user
+        instance if there is one that matches or ``None`` if there is not.
+        """
+        return cls.query.filter_by(token_name=token_name).one_or_none()
+
+    @classmethod
+    def identify(cls, id):
+        """
+        *Required Method*
+
+        flask-praetorian requires that the user class implements an ``identify()``
+        class method that takes a single ``id`` argument and returns user instance if
+        there is one that matches or ``None`` if there is not.
+        """
+        return cls.query.get(id)
+
+    def is_valid(self):
+        return self.is_active
+
 
 # Initialize flask app for the example
 app = flask.Flask(__name__)
@@ -86,10 +141,11 @@ app.config["JWT_ACCESS_LIFESPAN"] = {"hours": 24}
 app.config["JWT_REFRESH_LIFESPAN"] = {"days": 30}
 
 # Initialize the flask-praetorian instance for the app
-guard.init_app(app, User)
+guard.init_app(app, User, Token_Store)
 
 # Initialize a local database for the example
-local_database = tempfile.NamedTemporaryFile(prefix="local", suffix=".db")
+#local_database = tempfile.NamedTemporaryFile(prefix="local", suffix=".db")
+local_database = "testing_database.db"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///{}".format(local_database)
 db.init_app(app)
 
@@ -99,34 +155,39 @@ cors.init_app(app)
 # Add users for the example
 with app.app_context():
     db.create_all()
-    db.session.add(
-        User(
-            username="TheDude",
-            password=guard.hash_password("abides"),
+    if db.session.query(User).filter_by(username='TheDude').count() < 1:
+        db.session.add(
+            User(
+                username="TheDude",
+                hashed_password=guard.hash_password("abides"),
+            )
         )
-    )
-    db.session.add(
-        User(
-            username="Walter",
-            password=guard.hash_password("calmerthanyouare"),
-            roles="admin",
+        db.session.add(
+            User(
+                username="Walter",
+                hashed_password=guard.hash_password("calmerthanyouare"),
+                roles="admin",
+            )
         )
-    )
-    db.session.add(
-        User(
-            username="Donnie",
-            password=guard.hash_password("iamthewalrus"),
-            roles="operator",
+        db.session.add(
+            User(
+                username="Donnie",
+                hashed_password=guard.hash_password("iamthewalrus"),
+                roles="operator",
+            )
         )
-    )
-    db.session.add(
-        User(
-            username="Maude",
-            password=guard.hash_password("andthorough"),
-            roles="operator,admin",
+        db.session.add(
+            User(
+                username="Maude",
+                hashed_password=guard.hash_password("andthorough"),
+                roles="operator,admin",
+            )
         )
-    )
-    db.session.commit()
+
+        db.session.add(
+            Token_Store(token_name="me_api", roles="admin,superadmin")
+        )
+        db.session.commit()
 
 
 # Set up some routes for the example
@@ -167,6 +228,7 @@ def protected():
 
 
 @app.route("/protected_admin_required")
+@flask_praetorian.auth_required_jwt_or_api_token
 @flask_praetorian.roles_required("admin")
 def protected_admin_required():
     """
@@ -176,10 +238,19 @@ def protected_admin_required():
        $ curl http://localhost:5000/protected_admin_required -X GET \
           -H "Authorization: Bearer <your_token>"
     """
+
+    #print(flask_praetorian.current_token().token_name)
+    # TODO Fix this hack to get the jwt data and determine if it is a user or a token_store
+    # TODO I added the function, get_jwt_data_from_app_context to be used by external programs
+    jwt = flask_praetorian.get_jwt_data_from_app_context()
+    print(type(jwt))
+    roles = flask_praetorian.current_rolenames()
+    print(roles)
+    custom_claims = flask_praetorian.current_custom_claims()
+    is_api_call = custom_claims.pop('is_api', False)
+    print("is_api_call")
     return flask.jsonify(
-        message="protected_admin_required endpoint (allowed user {})".format(
-            flask_praetorian.current_user().username,
-        )
+        message=f"protected_admin_required endpoint (allowed token or user? {jwt})"
     )
 
 
@@ -194,6 +265,7 @@ def protected_operator_accepted():
        $ curl http://localhost/protected_operator_accepted -X GET \
          -H "Authorization: Bearer <your_token>"
     """
+    flask_praetorian
     return flask.jsonify(
         message="protected_operator_accepted endpoint (allowed usr {})".format(
             flask_praetorian.current_user().username,

@@ -64,7 +64,7 @@ from flask_praetorian.constants import (
     AccessType,
 )
 
-
+# added support for tokens
 class Praetorian:
     """
     Comprises the implementation for the flask-praetorian flask extension.
@@ -76,6 +76,7 @@ class Praetorian:
             self,
             app=None,
             user_class=None,
+            token_store_class=None,
             is_blacklisted=None,
             encode_jwt_token_hook=None,
             refresh_jwt_token_hook=None,
@@ -84,10 +85,12 @@ class Praetorian:
         self.hash_scheme = None
         self.salt = None
 
+        # TODO allow there to be only tokens if we want - not that important for now
         if app is not None and user_class is not None:
             self.init_app(
                 app,
                 user_class,
+                token_store_class,
                 is_blacklisted,
                 encode_jwt_token_hook,
                 refresh_jwt_token_hook,
@@ -97,6 +100,7 @@ class Praetorian:
             self,
             app=None,
             user_class=None,
+            token_store_class=None,
             is_blacklisted=None,
             encode_jwt_token_hook=None,
             refresh_jwt_token_hook=None,
@@ -108,6 +112,8 @@ class Praetorian:
                                         extension to
         :param: user_class:             The class used to interact with
                                         user data
+        :param: token_store_class:      The class used to interact with
+                                        token store data
         :param: is_blacklisted:         A method that may optionally be
                                         used to check the token against
                                         a blacklist when access or refresh
@@ -172,6 +178,8 @@ class Praetorian:
         )
 
         self.user_class = self._validate_user_class(user_class)
+        #self.token_class = self._validate_token_class(token_class)
+        self.token_store_class = token_store_class
         self.is_blacklisted = is_blacklisted or (lambda t: False)
         self.encode_jwt_token_hook = encode_jwt_token_hook
         self.refresh_jwt_token_hook = refresh_jwt_token_hook
@@ -342,6 +350,70 @@ class Praetorian:
             )
 
         return user_class
+
+    def _validate_token_class(self, token_store_class):
+        """
+        Validates the supplied user_class to make sure that it has the
+        class methods and attributes necessary to function correctly.
+        After validating class methods, will attempt to instantiate a dummy
+        instance of the user class to test for the requisite attributes
+
+        Requirements:
+
+        - ``lookup`` method. Accepts a string parameter, returns instance
+        - ``identify`` method. Accepts an identity parameter, returns instance
+        - ``identity`` attribute. Provides unique id for the instance
+        - ``rolenames`` attribute. Provides list of roles attached to instance
+        - ``password`` attribute. Provides hashed password for instance  # TODO remove password
+        """
+        PraetorianError.require_condition(
+            getattr(token_store_class, 'lookup', None) is not None,
+            textwrap.dedent("""
+                The user_class must have a lookup class method:
+                user_class.lookup(<str>) -> <user instance>
+            """),
+        )
+        PraetorianError.require_condition(
+            getattr(token_store_class, 'identify', None) is not None,
+            textwrap.dedent("""
+                The user_class must have an identify class method:
+                user_class.identify(<identity>) -> <user instance>
+            """),
+        )
+
+        dummy_token_store = None
+        try:
+            dummy_token_store = token_store_class()
+        except Exception:
+            flask.current_app.logger.debug(
+                "Skipping instance validation because "
+                "token cannot be instantiated without arguments"
+            )
+        if dummy_token_store:
+            PraetorianError.require_condition(
+                hasattr(dummy_token_store, "identity"),
+                textwrap.dedent("""
+                    Instances of token_class must have an identity attribute:
+                    token_instance.identity -> <unique id for instance>
+                """),
+            )
+            PraetorianError.require_condition(
+                self.roles_disabled or hasattr(dummy_token_store, "rolenames"),
+                textwrap.dedent("""
+                    Instances of token_class must have a rolenames attribute:
+                    token_instance.rolenames -> [<role1>, <role2>, ...]
+                """),
+            )
+
+            # PraetorianError.require_condition(
+            #     hasattr(dummy_token, "password"),
+            #     textwrap.dedent("""
+            #         Instances of user_class must have a password attribute:
+            #         user_instance.rolenames -> <hashed password>
+            #     """),
+            # )
+
+        return dummy_token_store
 
     def authenticate(self, username, password):
         """

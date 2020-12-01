@@ -116,6 +116,22 @@ def current_user_id():
     return user_id
 
 
+# same as above but we are after token!
+# might have to add custom claim if it is api or JWT
+def current_token_id():
+    """
+    This method returns the user id retrieved from jwt token data attached to
+    the current flask app's context
+    """
+    jwt_data = get_jwt_data_from_app_context()
+    token_id = jwt_data.get('id')
+    PraetorianError.require_condition(
+        token_id is not None,
+        "Could not fetch an id for the current token",
+    )
+    return token_id
+
+
 def current_user():
     """
     This method returns a user instance for jwt token data attached to the
@@ -129,6 +145,20 @@ def current_user():
         "Could not identify the current user from the current id",
     )
     return user
+
+def current_token(token_id):
+    """
+    This method returns a user instance for jwt token data attached to the
+    current flask app's context
+    """
+    #token_id = current_token_id()
+    guard = current_guard()
+    token = guard.token_store_class.identify(token_id)
+    PraetorianError.require_condition(
+        token is not None,
+        "Could not identify the current token from the current id",
+    )
+    return token
 
 
 def current_rolenames():

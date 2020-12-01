@@ -9,10 +9,11 @@ from flask_praetorian.exceptions import (
 
 from flask_praetorian.utilities import (
     current_guard,
+    current_token,
     add_jwt_data_to_app_context,
     app_context_has_jwt_data,
     remove_jwt_data_from_app_context,
-    current_rolenames,
+    current_rolenames
 )
 
 
@@ -70,6 +71,42 @@ def auth_accepted(method):
             remove_jwt_data_from_app_context()
     return wrapper
 
+from flask import request, abort, Response
+
+def auth_required_jwt_or_api_token(method):
+    """
+    This decorator is used to allow an authenticated user to be identified
+    while being able to access a flask route, and adds the current user to the
+    current flask context.
+
+    For Token store api we need to encode the token, then store the token decoded
+    """
+    @functools.wraps(method)
+    def wrapper(*args, **kwargs):
+        # check if we have a header for x-api-key or JWT token
+        print("I am here!")
+        token_id = request.headers.get('x-api-key', "")
+        print(token_id)
+        if token_id:
+            print("found da x-api-key")
+            print("creating a token_store based JWT")
+            token = current_token(token_id)
+            #token = {"id":1, "token_name":"my_api", "roles":"admin"}
+            encoded_jwt = current_guard().encode_jwt_token(token, is_api=True)
+            decoded_jwt = current_guard().extract_jwt_token(encoded_jwt)
+            add_jwt_data_to_app_context(decoded_jwt)
+            try:
+                return method(*args, **kwargs)
+            finally:
+                remove_jwt_data_from_app_context()
+        else:
+            _verify_and_add_jwt(optional=True)
+            try:
+                return method(*args, **kwargs)
+            finally:
+                remove_jwt_data_from_app_context()
+    return wrapper
+
 
 def roles_required(*required_rolenames):
     """
@@ -86,6 +123,8 @@ def roles_required(*required_rolenames):
                 "This feature is not available because roles are disabled",
             )
             role_set = set([str(n) for n in required_rolenames])
+            #TODO remove this print statement
+            print(role_set)
             _verify_and_add_jwt()
             try:
                 MissingRoleError.require_condition(

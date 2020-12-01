@@ -3,13 +3,14 @@ import tempfile
 import flask_sqlalchemy
 import flask_praetorian
 import flask_cors
+from flask_praetorian.user_mixins import SQLAlchemyUserMixin
 
 db = flask_sqlalchemy.SQLAlchemy()
 guard = flask_praetorian.Praetorian()
 cors = flask_cors.CORS()
 
 
-class User(db.Model, flask_sqlalchemy.SQLAlchemyUserMixin):
+class User(db.Model, SQLAlchemyUserMixin):
     """
     A generic user model that might be used by an app powered by flask-praetorian.
 
@@ -19,7 +20,7 @@ class User(db.Model, flask_sqlalchemy.SQLAlchemyUserMixin):
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.Text, unique=True)
-    hashed_password = db.Column(db.Text)
+    password = db.Column(db.Text)
     roles = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True, server_default="true")
 

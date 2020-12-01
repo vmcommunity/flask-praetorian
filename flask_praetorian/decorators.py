@@ -80,20 +80,21 @@ def auth_required_jwt_or_api_token(method):
     current flask context.
 
     For Token store api we need to encode the token, then store the token decoded
+    Added a custom claim is_api, to know that this is an api token call
     """
     @functools.wraps(method)
     def wrapper(*args, **kwargs):
-        # check if we have a header for x-api-key or JWT token
-        print("I am here!")
-        token_id = request.headers.get('x-api-key', "")
-        print(token_id)
-        if token_id:
+        # TODO put the x-api-key and such in the constants and check if is also found as a query parameter!
+        token_store_token_id = request.headers.get('x-api-key', "")
+        print(token_store_token_id)
+        if token_store_token_id:
             print("found da x-api-key")
-            print("creating a token_store based JWT")
-            token = current_token(token_id)
+            token_store_token = current_token(token_store_token_id)
+            print("hydrating a JWT for this api_token")
             #token = {"id":1, "token_name":"my_api", "roles":"admin"}
-            encoded_jwt = current_guard().encode_jwt_token(token, is_api=True)
+            encoded_jwt = current_guard().encode_jwt_token(token_store_token, is_api=True)
             decoded_jwt = current_guard().extract_jwt_token(encoded_jwt)
+            # TODO have the model check for it's enabled, not expired and such using the underlying Token_store model
             add_jwt_data_to_app_context(decoded_jwt)
             try:
                 return method(*args, **kwargs)

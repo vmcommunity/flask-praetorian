@@ -8,6 +8,8 @@ db = flask_sqlalchemy.SQLAlchemy()
 guard = flask_praetorian.Praetorian()
 cors = flask_cors.CORS()
 
+import uuid
+import shortuuid
 
 # A generic user model that might be used by an app powered by flask-praetorian
 class User(db.Model):
@@ -78,7 +80,7 @@ class User(db.Model):
         return self.is_active
 
 class Token_Store(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.Text, primary_key=True)
     token_name = db.Column(db.Text, unique=True)
     roles = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True, server_default="true")
@@ -184,8 +186,12 @@ with app.app_context():
             )
         )
 
+        token_id = uuid.uuid4()
+        token_id = shortuuid.encode(token_id)
+        print(token_id)
+
         db.session.add(
-            Token_Store(token_name="me_api", roles="admin,superadmin")
+            Token_Store(id=token_id, token_name="me_api", roles="admin,superadmin")
         )
         db.session.commit()
 

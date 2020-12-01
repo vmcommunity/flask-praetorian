@@ -188,7 +188,8 @@ with app.app_context():
 
         token_id = uuid.uuid4()
         token_id = shortuuid.encode(token_id)
-        print(token_id)
+        token_id = "PrrxTy9cD6iKE4TbnedeZS"  # comment out if you want to test a random UUID
+        # print(token_id)
 
         db.session.add(
             Token_Store(id=token_id, token_name="me_api", roles="admin,superadmin")
@@ -217,7 +218,7 @@ def login():
 
 
 @app.route("/protected")
-@flask_praetorian.auth_required
+@flask_praetorian.auth_required_jwt_or_api_token
 def protected():
     """
     A protected endpoint. The auth_required decorator will require a header
@@ -226,10 +227,18 @@ def protected():
        $ curl http://localhost:5000/protected -X GET \
          -H "Authorization: Bearer <your_token>"
     """
-    return flask.jsonify(
-        message="protected endpoint (allowed user {})".format(
+    # TODO put these in their own function
+    custom_claims = flask_praetorian.current_custom_claims()
+    is_api_call = custom_claims.pop('is_api', False)
+    message = ""
+    if is_api_call:
+        message = f"protected endpoint allowed: Token Store token_id is {flask_praetorian.current_token_id()}"
+    else:
+        message = "protected endpoint (allowed usr {})".format(
             flask_praetorian.current_user().username,
         )
+    return flask.jsonify(
+        message=message
     )
 
 
@@ -261,6 +270,7 @@ def protected_admin_required():
 
 
 @app.route("/protected_operator_accepted")
+@flask_praetorian.auth_required_jwt_or_api_token
 @flask_praetorian.roles_accepted("operator", "admin")
 def protected_operator_accepted():
     """
@@ -271,11 +281,18 @@ def protected_operator_accepted():
        $ curl http://localhost/protected_operator_accepted -X GET \
          -H "Authorization: Bearer <your_token>"
     """
-    flask_praetorian
-    return flask.jsonify(
-        message="protected_operator_accepted endpoint (allowed usr {})".format(
+    # TODO put these in their own function
+    custom_claims = flask_praetorian.current_custom_claims()
+    is_api_call = custom_claims.pop('is_api', False)
+    message = ""
+    if is_api_call:
+        message = f" Token Store token_id is {flask_praetorian.current_token_id()}"
+    else:
+        message = "protected_operator_accepted endpoint (allowed usr {})".format(
             flask_praetorian.current_user().username,
         )
+    return flask.jsonify(
+        message=message
     )
 
 

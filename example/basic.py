@@ -271,7 +271,7 @@ def protected_admin_required():
 
 @app.route("/protected_operator_accepted")
 @flask_praetorian.auth_required_jwt_or_api_token
-@flask_praetorian.roles_accepted("operator", "admin")
+# @flask_praetorian.roles_accepted("operator", "admin")
 def protected_operator_accepted():
     """
     A protected endpoint that accepts any of the listed roles. The

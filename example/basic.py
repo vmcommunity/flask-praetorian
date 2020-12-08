@@ -84,6 +84,7 @@ class Token_Store(db.Model):
     token_name = db.Column(db.Text, unique=True)
     roles = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True, server_default="true")
+    company = db.Column(db.Integer)
 
     @property
     def identity(self):
@@ -133,6 +134,10 @@ class Token_Store(db.Model):
 
     def is_valid(self):
         return self.is_active
+
+    @property
+    def get_company(self):
+        return self.company
 
 
 # Initialize flask app for the example
@@ -192,7 +197,7 @@ with app.app_context():
         # print(token_id)
 
         db.session.add(
-            Token_Store(id=token_id, token_name="me_api", roles="admin,superadmin")
+            Token_Store(id=token_id, token_name="me_api", roles="admin,superadmin", company=1)
         )
         db.session.commit()
 

@@ -92,7 +92,7 @@ def auth_required_jwt_or_api_token(method):
             token_store_token = current_token(token_store_token_id)
             print("hydrating a JWT for this api_token")
             #token = {"id":1, "token_name":"my_api", "roles":"admin"}
-            encoded_jwt = current_guard().encode_jwt_token(token_store_token, is_api=True)
+            encoded_jwt = current_guard().encode_token_to_jwt_token(token_store_token, is_api=True)
             decoded_jwt = current_guard().extract_jwt_token(encoded_jwt)
             # TODO have the model check for it's enabled, not expired and such using the underlying Token_store model
             add_jwt_data_to_app_context(decoded_jwt)

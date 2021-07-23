@@ -156,7 +156,7 @@ def current_token(token_id):
     token = guard.token_store_class.identify(token_id)
     PraetorianError.require_condition(
         token is not None,
-        "Could not identify the current token from the current token_id",
+        "Could not identify the current token from the current id",
     )
     return token
 

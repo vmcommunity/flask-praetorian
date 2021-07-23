@@ -46,7 +46,6 @@ from flask_praetorian.constants import (
     DEFAULT_JWT_REFRESH_LIFESPAN,
     DEFAULT_JWT_RESET_LIFESPAN,
     DEFAULT_USER_CLASS_VALIDATION_METHOD,
-    DEFAULT_TOKEN_ID_CLASS_VALIDATION_METHOD,
     DEFAULT_CONFIRMATION_TEMPLATE,
     DEFAULT_CONFIRMATION_SUBJECT,
     DEFAULT_RESET_TEMPLATE,
@@ -225,11 +224,6 @@ class Praetorian:
         self.user_class_validation_method = app.config.get(
             'USER_CLASS_VALIDATION_METHOD',
             DEFAULT_USER_CLASS_VALIDATION_METHOD,
-        )
-
-        self.user_class_validation_method = app.config.get(
-            'TOKEN_ID_CLASS_VALIDATION_METHOD',
-            DEFAULT_TOKEN_ID_CLASS_VALIDATION_METHOD,
         )
 
         self.confirmation_template = app.config.get(
@@ -511,28 +505,6 @@ class Praetorian:
             "The user is not valid or has had access revoked",
         )
 
-    def _check_token_id(self, token):
-        """
-        Checks to make sure that a user is valid. First, checks that the user
-        is not None. If this check fails, a MissingUserError is raised. Next,
-        checks if the user has a validation method. If the method does not
-        exist, the check passes. If the method exists, it is called. If the
-        result of the call is not truthy, an InvalidUserError is raised
-        """
-        MissingUserError.require_condition(
-            token is not None,
-            'Could not find the requested user',
-        )
-        user_validate_method = getattr(
-            token, self.user_class_validation_method, None
-        )
-        if user_validate_method is None:
-            return
-        InvalidUserError.require_condition(
-            user_validate_method(),
-            "The user is not valid or has had access revoked",
-        )
-
     def encode_jwt_token(
             self, user,
             override_access_lifespan=None, override_refresh_lifespan=None,
@@ -594,81 +566,6 @@ class Praetorian:
             'jti': str(uuid.uuid4()),
             'id': user.identity,
             'rls': ','.join(user.rolenames),
-            REFRESH_EXPIRATION_CLAIM: refresh_expiration,
-        }
-        if is_registration_token:
-            payload_parts[IS_REGISTRATION_TOKEN_CLAIM] = True
-        if is_reset_token:
-            payload_parts[IS_RESET_TOKEN_CLAIM] = True
-        flask.current_app.logger.debug(
-            "Attaching custom claims: {}".format(custom_claims),
-        )
-        payload_parts.update(custom_claims)
-
-        if self.encode_jwt_token_hook:
-            self.encode_jwt_token_hook(**payload_parts)
-        return jwt.encode(
-            payload_parts, self.encode_key, self.encode_algorithm,
-        ).decode('utf-8')
-
-    def encode_token_to_jwt_token(
-            self, token,
-            override_access_lifespan=None, override_refresh_lifespan=None,
-            is_registration_token=False, is_reset_token=False,
-            **custom_claims
-    ):
-        """
-        Encodes user data into a jwt token that can be used for authorization
-        at protected endpoints
-
-        :param: override_access_lifespan:  Override's the instance's access
-                                           lifespan to set a custom duration
-                                           after which the new token's
-                                           accessability will expire. May not
-                                           exceed the refresh_lifespan
-        :param: override_refresh_lifespan: Override's the instance's refresh
-                                           lifespan to set a custom duration
-                                           after which the new token's
-                                           refreshability will expire.
-        :param: bypass_token_id_check:     Override checking the token_id for
-                                           being real/active.
-        :param: custom_claims:             Additional claims that should
-                                           be packed in the payload. Note that
-                                           any claims supplied here must be
-                                           JSON compatible types
-        """
-        ClaimCollisionError.require_condition(
-            set(custom_claims.keys()).isdisjoint(RESERVED_CLAIMS),
-            "The custom claims collide with required claims",
-        )
-
-        # TODO check token is valid
-        # if not bypass_user_check:
-        #     self._check_token(token)
-
-        moment = pendulum.now('UTC')
-
-        if override_refresh_lifespan is None:
-            refresh_lifespan = self.refresh_lifespan
-        else:
-            refresh_lifespan = override_refresh_lifespan
-        refresh_expiration = (moment + refresh_lifespan).int_timestamp
-
-        if override_access_lifespan is None:
-            access_lifespan = self.access_lifespan
-        else:
-            access_lifespan = override_access_lifespan
-        access_expiration = min(
-            (moment + access_lifespan).int_timestamp,
-            refresh_expiration,
-        )
-
-        payload_parts = {
-            'iat': moment.int_timestamp,
-            'exp': access_expiration,
-            'jti': str(uuid.uuid4()),
-            'id': token.get_company,
-            'rls': ','.join(token.rolenames),
             REFRESH_EXPIRATION_CLAIM: refresh_expiration,
         }
         if is_registration_token:

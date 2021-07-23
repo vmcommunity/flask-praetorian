@@ -16,7 +16,6 @@ DEFAULT_JWT_ALLOWED_ALGORITHMS = ["HS256"]
 DEFAULT_ROLES_DISABLED = False
 
 DEFAULT_USER_CLASS_VALIDATION_METHOD = "is_valid"
-DEFAULT_TOKEN_ID_CLASS_VALIDATION_METHOD = "is_valid"
 
 DEFAULT_CONFIRMATION_TEMPLATE = (
     "{}/flask_praetorian/templates/registration_email.html".format(

@@ -37,13 +37,12 @@ DEFAULT_RESET_SUBJECT = "Password Reset Requested"
 DEFAULT_HASH_AUTOUPDATE = False
 DEFAULT_HASH_AUTOTEST = False
 DEFAULT_HASH_SCHEME = "pbkdf2_sha512"
+# only allow one hash scheme
+# due to this bug: https://github.com/advisories/GHSA-ffqj-6fqr-9h24
+# TODO upgrade this version and integrate my fixes within it
+
 DEFAULT_HASH_ALLOWED_SCHEMES = [
-    "pbkdf2_sha512",
-    "sha256_crypt",
-    "sha512_crypt",
-    "bcrypt",
-    "argon2",
-    "bcrypt_sha256",
+    "pbkdf2_sha512"
 ]
 DEFAULT_HASH_DEPRECATED_SCHEMES = []
 
